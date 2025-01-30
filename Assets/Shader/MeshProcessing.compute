@@ -1,0 +1,16 @@
+#pragma kernel CSMain
+
+struct VertexData {
+    float3 position;
+    float4 color;
+};
+
+RWStructuredBuffer<VertexData> vertices;
+
+[numthreads(256, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= vertices.Length) return;
+    
+    float3 pos = vertices[id.x].position;
+    vertices[id.x].position = float3(pos.x, pos.z, -pos.y);
+}
