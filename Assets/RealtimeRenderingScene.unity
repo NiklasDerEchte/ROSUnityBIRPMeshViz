@@ -42,7 +42,8 @@ RenderSettings:
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 12
+  serializedVersion: 13
+  m_BakeOnSceneLoad: 0
   m_GISettings:
     serializedVersion: 2
     m_BounceScale: 1
@@ -524,6 +525,10 @@ PrefabInstance:
     - target: {fileID: 4793074411871695736, guid: 6c47a525a16504d4c85b85f1ab077aaf, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8508171366431624910, guid: 6c47a525a16504d4c85b85f1ab077aaf, type: 3}
+      propertyPath: rosTopicName
+      value: /object_markers
       objectReference: {fileID: 0}
     - target: {fileID: 8508171366431624910, guid: 6c47a525a16504d4c85b85f1ab077aaf, type: 3}
       propertyPath: renderTargetObject

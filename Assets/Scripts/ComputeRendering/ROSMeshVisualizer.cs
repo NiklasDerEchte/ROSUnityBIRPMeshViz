@@ -26,12 +26,10 @@ namespace ComputeRendering {
         private Material meshMaterial;
         private MeshProcessingUnit meshProcessingUnit;
         
-        private PerformanceAnalysis meshPerformanceAnalysis;
-        private PerformanceAnalysis messagePerformanceAnalysis;
+        private PerformanceAnalysis performanceAnalysis;
 
         void Start() {
-            this.meshPerformanceAnalysis = new PerformanceAnalysis("Mesh");
-            this.messagePerformanceAnalysis = new PerformanceAnalysis("Message");
+            this.performanceAnalysis = new PerformanceAnalysis();
             if(this.meshProcessingUnit == null) {
                 this.meshProcessingUnit = GetComponent<MeshProcessingUnit>();
             }
@@ -77,7 +75,7 @@ namespace ComputeRendering {
 
             this.messageQueue.Enqueue(markerArrayMsg);
             if (this.enableAnalysis) {
-                this.messagePerformanceAnalysis.Tick();
+                this.performanceAnalysis.Tick("message-received");
             }
         }
 
@@ -91,15 +89,13 @@ namespace ComputeRendering {
 
 
         void UpdateQueue() {
-            Debug.Log("Message-queue size: " + this.messageQueue.Count);
             if (!this.semaphore) {
-                Debug.Log("Mutex is locked.");
                 return;
             }
 
             this.semaphore = false;
             if (this.enableAnalysis) {
-                this.meshPerformanceAnalysis.Tick();
+                this.performanceAnalysis.Tick("mesh-processing");
             }
             Debug.Log("Processing mesh.");
             MarkerArrayMsg markerArrayMsg = this.messageQueue.Dequeue();
@@ -159,7 +155,8 @@ namespace ComputeRendering {
                     vertexArray[i].color = lastColor;
                 }
             }
-
+            Debug.Log("Mesh converted in " + (System.DateTimeOffset.Now.ToUnixTimeMilliseconds() - startTime) + "ms");
+            startTime = System.DateTimeOffset.Now.ToUnixTimeMilliseconds();
             this.meshProcessingUnit.VertexDataToMesh(vertexArray, renderObject.mesh);
 
             var meshFilter = renderObject.gameObject.GetComponent<MeshFilter>();
@@ -170,8 +167,7 @@ namespace ComputeRendering {
                 Debug.LogError("MeshFilter not found.");
                 StartCoroutine(ResetSemaphore(0));
             }
-
-            Debug.Log("Mesh processed in " + (System.DateTimeOffset.Now.ToUnixTimeMilliseconds() - startTime) + "ms");
+            
             StartCoroutine(ResetSemaphore());
         }
 
@@ -185,10 +181,6 @@ namespace ComputeRendering {
             if (rosConnection != null) {
                 rosConnection.Unsubscribe(rosTopicName);
             }
-            if (this.enableAnalysis) {
-                this.meshPerformanceAnalysis.SaveToFile();
-                this.messagePerformanceAnalysis.SaveToFile();
-            }
         }
 
         void OnDestroy() {
@@ -196,8 +188,7 @@ namespace ComputeRendering {
                 rosConnection.Unsubscribe(rosTopicName);
             }
             if (this.enableAnalysis) {
-                this.meshPerformanceAnalysis.SaveToFile();
-                this.messagePerformanceAnalysis.SaveToFile();
+                this.performanceAnalysis.SaveToFile();
             }
         }
     }

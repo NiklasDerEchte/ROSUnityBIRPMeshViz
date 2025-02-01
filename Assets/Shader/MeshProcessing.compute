@@ -1,3 +1,4 @@
+// Anzahl der Threads pro Gruppe (z. B. 256 Threads pro Dispatch-Aufruf)
 #pragma kernel CSMain
 
 struct VertexData {
@@ -5,12 +6,23 @@ struct VertexData {
     float4 color;
 };
 
-RWStructuredBuffer<VertexData> vertices;
+RWStructuredBuffer<VertexData> vertices;  // Output: GPU berechnete Vertices
+RWStructuredBuffer<int> triangles;        // Output: GPU generierte Indizes
+RWStructuredBuffer<float4> colors;        // Output: Vertex-Farben
 
-[numthreads(256, 1, 1)]
+[numthreads(256, 1, 1)] // 256 parallele Threads
 void CSMain(uint3 id : SV_DispatchThreadID) {
-    if (id.x >= vertices.Length) return;
-    
-    float3 pos = vertices[id.x].position;
-    vertices[id.x].position = float3(pos.x, pos.z, -pos.y);
+    if (id.x >= vertices.Length) return; // Index außerhalb des Bereichs verhindern
+
+    // Kopiere Position und Farbe
+    colors[id.x] = vertices[id.x].color;
+
+    // Generiere Triangle-Indizes (jedes 3. Vertex ist ein neues Dreieck)
+    if (id.x % 3 == 0 && id.x + 2 < vertices.Length) {
+        triangles[id.x] = id.x;
+        triangles[id.x + 1] = id.x + 1;
+        triangles[id.x + 2] = id.x + 2;
+    }
 }
+
+// todo Mesh abhängig von einem image machen und das RawImage hier verarbeiten?

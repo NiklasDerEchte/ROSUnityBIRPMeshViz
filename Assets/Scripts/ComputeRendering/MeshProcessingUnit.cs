@@ -26,6 +26,7 @@ namespace ComputeRendering {
         }
         
         IEnumerator ProcessMeshOnCPU(VertexData[] vertexArray, Mesh mesh) {
+            long startTime = System.DateTimeOffset.Now.ToUnixTimeMilliseconds();
             int vertexCount = vertexArray.Length;
             Vector3[] vertices = new Vector3[vertexCount];
             Color[] vertexColors = new Color[vertexCount];
@@ -52,6 +53,7 @@ namespace ComputeRendering {
             mesh.colors = vertexColors;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
+            Debug.Log("Mesh processed in " + (System.DateTimeOffset.Now.ToUnixTimeMilliseconds() - startTime) + "ms on CPU");
             yield return null;
         }
         
