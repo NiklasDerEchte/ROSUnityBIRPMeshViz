@@ -18,6 +18,7 @@ namespace ComputeRendering {
     public class PerformanceAnalysis {
         private string fileDateFormat = "yyyy_MM_dd_HH_mm_ss";
         private Dictionary<string, PerformanceData> batchData = new Dictionary<string, PerformanceData>();
+        private Dictionary<string, float> records = new Dictionary<string, float>();
 
         public void Tick(string key) {
             float currentTime = Time.realtimeSinceStartup;
@@ -37,6 +38,33 @@ namespace ComputeRendering {
             performanceData.lastTickTime = currentTime;
 
             performanceData.tickTimes.Add(deltaTime);
+        }
+
+        public void StartRecord(string key) {
+            this.records[key] = Time.realtimeSinceStartup;
+        }
+
+        public void StopRecord(string key) {
+            if (this.records.TryGetValue(key, out float currentTime)) {
+                this.records.Remove(key);
+                PerformanceData performanceData;
+                if (this.batchData.TryGetValue(key, out var value)) {
+                    performanceData = value;
+                }
+                else {
+                    performanceData = new PerformanceData();
+                    performanceData.name = key;
+                    performanceData.tickTimes = new List<float>();
+                    performanceData.lastTickTime = currentTime;
+                    this.batchData.Add(key, performanceData);
+                }
+            
+                float deltaTime = currentTime - performanceData.lastTickTime;
+                performanceData.lastTickTime = currentTime;
+
+                performanceData.tickTimes.Add(deltaTime);
+            }
+            
         }
 
         public void SaveToFile() {

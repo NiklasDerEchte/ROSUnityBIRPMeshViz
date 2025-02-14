@@ -11,8 +11,7 @@ namespace ComputeRendering {
         public GameObject gameObject;
         public Mesh mesh;
     }
-
-    [RequireComponent(typeof(MeshProcessingUnit))]
+    
     public class ROSMeshVisualizer : MonoBehaviour {
         public GameObject renderTargetObject;
         public string rosTopicName = "/object_markers";
@@ -24,15 +23,11 @@ namespace ComputeRendering {
         private bool semaphore = true;
         private ROSConnection rosConnection;
         private Material meshMaterial;
-        private MeshProcessingUnit meshProcessingUnit;
         
         private PerformanceAnalysis performanceAnalysis;
 
         void Start() {
             this.performanceAnalysis = new PerformanceAnalysis();
-            if(this.meshProcessingUnit == null) {
-                this.meshProcessingUnit = GetComponent<MeshProcessingUnit>();
-            }
             this.rosConnection = ROSConnection.GetOrCreateInstance();
             if (this.rosConnection == null) {
                 Debug.LogError("ROSConnection init failed.");
@@ -94,10 +89,7 @@ namespace ComputeRendering {
             }
 
             this.semaphore = false;
-            if (this.enableAnalysis) {
-                this.performanceAnalysis.Tick("mesh-processing");
-            }
-            Debug.Log("Processing mesh.");
+            Debug.Log("Processing message. Messages remaining " + this.messageQueue.Count);
             MarkerArrayMsg markerArrayMsg = this.messageQueue.Dequeue();
             bool processed = false;
             for (int index = 0; index < this.renderObjects.Length; index++) {
@@ -112,9 +104,8 @@ namespace ComputeRendering {
                     renderObject.gameObject.SetActive(false);
                     continue;
                 }
-
                 processed = true;
-                StartCoroutine(ProcessMesh(marker, renderObject));
+                StartCoroutine(ProcessMarker(marker, renderObject));
             }
 
             if (!processed) {
@@ -122,24 +113,25 @@ namespace ComputeRendering {
             }
         }
 
-        IEnumerator ProcessMesh(MarkerMsg marker, RenderObject renderObject) {
-            long startTime = System.DateTimeOffset.Now.ToUnixTimeMilliseconds();
+        IEnumerator ProcessMarker(MarkerMsg marker, RenderObject renderObject) {
+            if (this.enableAnalysis) {
+                this.performanceAnalysis.StartRecord("mesh-processing");
+            }
 
             int vertexCount = marker.points.Length;
-            VertexData[] vertexArray = new VertexData[vertexCount];
             Color lastColor = Color.cyan;
             Debug.Log("Processing " + vertexCount + " vertices.");
+            
+            Vector3[] vertices = new Vector3[vertexCount];
+            Color[] vertexColors = new Color[vertexCount];
+            List<int> triangles = new List<int>();
+
             for (int i = 0; i < vertexCount; i++) {
-                if (i % 100 == 0) {
-                    yield return null;
-                }
-                
-                vertexArray[i].position = new Vector3(
+                vertices[i] = new Vector3(
                     (float)marker.points[i].x, 
                     (float)marker.points[i].z,
                     (float)marker.points[i].y * (-1f) // ROS z is inverted to Unity y
                 );
-                
                 
                 if (marker.colors != null && marker.colors.Length > i) {
                     var rosColor = marker.colors[i];
@@ -149,16 +141,34 @@ namespace ComputeRendering {
                         (float)rosColor.b,
                         (float)rosColor.a
                     );
-                    vertexArray[i].color = lastColor;
+                    vertexColors[i] = lastColor;
                 }
                 else {
-                    vertexArray[i].color = lastColor;
+                    vertexColors[i] = lastColor;
+                }
+                
+                if (i % 3 == 0 && i + 2 < vertexCount) {
+                    triangles.Add(i);
+                    triangles.Add(i + 1);
+                    triangles.Add(i + 2);
+                }
+                
+                if (i % 300 == 0) {
+                    yield return null;
                 }
             }
-            Debug.Log("Mesh converted in " + (System.DateTimeOffset.Now.ToUnixTimeMilliseconds() - startTime) + "ms");
-            startTime = System.DateTimeOffset.Now.ToUnixTimeMilliseconds();
-            this.meshProcessingUnit.VertexDataToMesh(vertexArray, renderObject.mesh);
-
+            
+            renderObject.mesh.Clear();
+            renderObject.mesh.vertices = vertices;
+            renderObject.mesh.triangles = triangles.ToArray();
+            renderObject.mesh.colors = vertexColors;
+            renderObject.mesh.RecalculateNormals();
+            renderObject.mesh.RecalculateBounds();
+            
+            if (this.enableAnalysis) {
+                this.performanceAnalysis.StopRecord("mesh-processing");
+            }
+            
             var meshFilter = renderObject.gameObject.GetComponent<MeshFilter>();
             if (meshFilter != null) {
                 meshFilter.mesh = renderObject.mesh;
@@ -166,11 +176,10 @@ namespace ComputeRendering {
             else {
                 Debug.LogError("MeshFilter not found.");
                 StartCoroutine(ResetSemaphore(0));
-            }
-            
+            } 
             StartCoroutine(ResetSemaphore());
         }
-
+        
         IEnumerator ResetSemaphore(float seconds = 0.1f) {
             yield return new WaitForSeconds(seconds);
             this.semaphore = true;
